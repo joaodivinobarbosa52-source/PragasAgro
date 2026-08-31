@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="45%" r="70%">
+      <stop offset="0%" stop-color="#181c14"/>
+      <stop offset="100%" stop-color="#12140f"/>
+    </radialGradient>
+    <linearGradient id="mark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7fa050"/>
+      <stop offset="100%" stop-color="#d98e3e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- fundo (safe area maskable: conteúdo importante dentro do círculo central) -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- selo/marca -->
+  <circle cx="256" cy="256" r="150" fill="url(#mark)"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#12140f" stroke-opacity=".15" stroke-width="2"/>
+
+  <!-- monograma PS -->
+  <text x="256" y="286" text-anchor="middle"
+        font-family="'Rajdhani','Arial Narrow',sans-serif" font-weight="700"
+        font-size="150" fill="#12140f" letter-spacing="-4">PS</text>
+
+  <!-- pequena folha estilizada acima do monograma, remete a lavoura -->
+  <path d="M256 96 C232 108 222 132 232 156 C244 148 258 132 262 110 C266 132 258 150 244 162
+           C260 168 280 158 286 138 C292 116 278 100 256 96 Z"
+        fill="#eef0e6" fill-opacity=".85"/>
+</svg>
