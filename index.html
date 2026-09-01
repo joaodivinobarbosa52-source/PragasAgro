@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>PragaTrack — Avaliação de Pragas Soja & Milho</title>
+<meta name="theme-color" content="#12140f">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDXjBWQDSrhOuDND9BAU4zn5u_r3wXdUHM",
+    authDomain: "pragatrack.firebaseapp.com",
+    projectId: "pragatrack",
+    storageBucket: "pragatrack.firebasestorage.app",
+    messagingSenderId: "981257658476",
+    appId: "1:981257658476:web:d21a1de4f5d9c0c17bb849"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+</script>
+<style>
+:root{
+  --bg:#12140f;
+  --bg2:#181c14;
+  --card:#1d221a;
+  --line:#2b3324;
+  --ink:#eef0e6;
+  --ink-dim:#9aa68c;
+  --milho:#d98e3e;
+  --soja:#7fa050;
+  --ok:#5a9e5a;
+  --atencao:#d9b33e;
+  --controle:#c9553c;
+  --font-display: 'Rajdhani', 'Arial Narrow', sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
+}
+@font-face{
+  font-family:'Rajdhani';
+  src: local('Rajdhani');
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);height:100%;overscroll-behavior-y:none;}
+body{padding-bottom:76px;}
+h1,h2,h3{font-family:var(--font-display);letter-spacing:.02em;font-weight:700;margin:0 0 4px;}
+.mono{font-family:var(--font-mono);}
+#app{max-width:520px;margin:0 auto;min-height:100vh;position:relative;}
+
+/* topbar */
+.topbar{position:sticky;top:0;z-index:50;background:linear-gradient(180deg,var(--bg) 70%,transparent);padding:16px 16px 8px;display:flex;align-items:center;justify-content:space-between;}
+.brand{display:flex;align-items:center;gap:10px;}
+.brand .mark{width:34px;height:34px;border-radius:9px;overflow:hidden;flex-shrink:0;background:#0c0e09;}
+.brand .mark img{width:100%;height:100%;object-fit:cover;display:block;}
+.brand h1{font-size:19px;margin:0;}
+.brand small{color:var(--ink-dim);font-size:11px;display:block;margin-top:-2px;}
+.icon-btn{background:var(--card);border:1px solid var(--line);color:var(--ink);width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+
+.screen{display:none;padding:4px 16px 24px;animation:fade .18s ease;}
+.screen.active{display:block;}
+@keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px;}
+.card h3{font-size:15px;color:var(--ink);}
+.muted{color:var(--ink-dim);font-size:13px;line-height:1.5;}
+
+.crop-toggle{display:flex;gap:8px;margin-bottom:14px;}
+.crop-btn{flex:1;padding:14px 8px;border-radius:14px;border:1.5px solid var(--line);background:var(--bg2);text-align:center;font-family:var(--font-display);font-weight:700;font-size:16px;color:var(--ink-dim);}
+.crop-btn.soja.active{border-color:var(--soja);background:rgba(127,160,80,.14);color:var(--soja);}
+.crop-btn.milho.active{border-color:var(--milho);background:rgba(217,142,62,.14);color:var(--milho);}
+.crop-btn span{display:block;font-family:var(--font-body);font-weight:400;font-size:11px;margin-top:2px;}
+
+label{display:block;font-size:12px;color:var(--ink-dim);margin:10px 0 5px;text-transform:uppercase;letter-spacing:.05em;}
+input[type=text],input[type=number],input[type=email],input[type=password],select,textarea{
+  width:100%;background:var(--bg2);border:1px solid var(--line);color:var(--ink);padding:12px 12px;border-radius:10px;font-size:15px;font-family:var(--font-body);
+}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--soja);}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border-radius:12px;border:none;font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.02em;cursor:pointer;}
+.btn-primary{background:linear-gradient(135deg,var(--soja),#5c7a3b);color:#0e1409;}
+.btn-milho{background:linear-gradient(135deg,var(--milho),#a85f1f);color:#1a0f04;}
+.btn-outline{background:transparent;border:1.5px solid var(--line);color:var(--ink);}
+.btn-danger{background:transparent;border:1.5px solid var(--controle);color:var(--controle);}
+.btn-sm{padding:9px 12px;font-size:13px;border-radius:9px;}
+.btn:disabled{opacity:.4;}
+.row{display:flex;gap:8px;}
+.row>*{flex:1;}
+
+/* bottom nav */
+.navbar{position:fixed;bottom:0;left:0;right:0;background:rgba(24,28,20,.96);backdrop-filter:blur(8px);border-top:1px solid var(--line);z-index:60;}
+.navbar-inner{max-width:520px;margin:0 auto;display:flex;}
+.navbtn{flex:1;padding:10px 4px 12px;text-align:center;background:none;border:none;color:var(--ink-dim);font-size:10.5px;font-family:var(--font-body);display:flex;flex-direction:column;align-items:center;gap:3px;}
+.navbtn .ic{font-size:19px;}
+.navbtn.active{color:var(--soja);}
+
+/* point cards */
+.point-card{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;}
+.point-thumb{width:52px;height:52px;border-radius:8px;object-fit:cover;background:#0e120c;flex-shrink:0;}
+.point-meta{flex:1;min-width:0;}
+.point-meta .pname{font-weight:600;font-size:14px;}
+.point-meta .psub{font-size:12px;color:var(--ink-dim);}
+.status-chip{font-size:10.5px;padding:3px 8px;border-radius:20px;font-weight:700;letter-spacing:.03em;white-space:nowrap;font-family:var(--font-display);}
+.status-ok{background:rgba(90,158,90,.18);color:var(--ok);}
+.status-atencao{background:rgba(217,179,62,.18);color:var(--atencao);}
+.status-controle{background:rgba(201,85,60,.18);color:var(--controle);}
+
+/* gauge (signature element) */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;padding:8px 0 4px;}
+.gauge-label{font-family:var(--font-display);font-size:13px;color:var(--ink-dim);letter-spacing:.06em;text-transform:uppercase;margin-top:6px;}
+.gauge-value{font-family:var(--font-display);font-size:26px;font-weight:700;margin-top:-46px;}
+
+/* pest list */
+.pest-item{display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line);}
+.pest-item:last-child{border-bottom:none;}
+.pest-item .pn{font-weight:600;font-size:14.5px;}
+.pest-item .pl{font-size:11.5px;color:var(--ink-dim);font-style:italic;}
+.pest-thumb{border-radius:10px;overflow:hidden;flex-shrink:0;background:#0e120c;}
+.pest-detail-photo{width:100%;height:170px;border-radius:14px;overflow:hidden;background:#0e120c;}
+.search-box{position:relative;margin-bottom:10px;}
+
+.map-box{height:230px;border-radius:14px;overflow:hidden;border:1px solid var(--line);margin-bottom:12px;}
+
+.empty{text-align:center;padding:40px 16px;color:var(--ink-dim);}
+.empty .big{font-size:36px;margin-bottom:8px;}
+
+.badge-crop{font-size:10px;padding:2px 7px;border-radius:6px;font-weight:700;font-family:var(--font-display);}
+.badge-crop.soja{background:rgba(127,160,80,.2);color:var(--soja);}
+.badge-crop.milho{background:rgba(217,142,62,.2);color:var(--milho);}
+
+.hist-item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px;}
+.hist-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+
+.modal-bg{position:fixed;inset:0;background:rgba(8,10,6,.72);z-index:100;display:flex;align-items:flex-end;}
+.modal-bg.hidden{display:none;}
+.modal{background:var(--bg2);width:100%;max-width:520px;margin:0 auto;border-radius:18px 18px 0 0;padding:18px 16px 26px;max-height:88vh;overflow-y:auto;}
+.modal-handle{width:36px;height:4px;background:var(--line);border-radius:3px;margin:0 auto 14px;}
+
+.toast{position:fixed;bottom:92px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid var(--line);padding:10px 18px;border-radius:30px;font-size:13px;z-index:200;opacity:0;transition:opacity .25s;pointer-events:none;}
+.toast.show{opacity:1;}
+
+.photo-preview{width:100%;height:150px;border-radius:12px;object-fit:cover;background:var(--bg);margin-bottom:8px;}
+.dashline{border:1.5px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--ink-dim);font-size:13px;}
+
+.ai-suggest{background:rgba(217,142,62,.09);border:1px solid rgba(217,142,62,.35);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:13px;display:flex;gap:8px;align-items:flex-start;}
+.ai-suggest .tag{font-family:var(--font-display);font-size:10px;color:var(--milho);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0;}
+.stat-box{background:var(--bg2);border-radius:12px;padding:12px;text-align:center;}
+.stat-box .n{font-family:var(--font-display);font-size:24px;font-weight:700;}
+.stat-box .l{font-size:10.5px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.05em;}
+
+.recbox{border-radius:14px;padding:14px;margin-bottom:10px;}
+.recbox.ok{background:rgba(90,158,90,.12);border:1px solid rgba(90,158,90,.35);}
+.recbox.controle{background:rgba(201,85,60,.12);border:1px solid rgba(201,85,60,.35);}
+.recbox .rt{font-family:var(--font-display);font-weight:700;font-size:15px;margin-bottom:3px;}
+
+#splash-screen{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:opacity .4s ease;}
+#splash-screen img{width:64px;height:64px;border-radius:16px;}
+#splash-screen h1{font-family:var(--font-display);font-size:22px;margin:4px 0 0;}
+#splash-screen p{color:var(--ink-dim);font-size:12px;margin:0;}
+#splash-screen.hide{opacity:0;pointer-events:none;}
+
+.app-footer{text-align:center;color:var(--ink-dim);font-size:11px;padding:14px 16px 90px;}
+
+#auth-screen{position:fixed;inset:0;z-index:9998;background:var(--bg);display:flex;flex-direction:column;justify-content:center;padding:24px;overflow-y:auto;}
+#auth-screen.hide{display:none;}
+#auth-screen .mark{width:56px;height:56px;border-radius:14px;overflow:hidden;margin:0 auto 10px;background:#0c0e09;}
+#auth-screen .mark img{width:100%;height:100%;object-fit:cover;display:block;}
+#auth-screen h1{text-align:center;font-size:22px;margin-bottom:2px;}
+#auth-screen .sub{text-align:center;color:var(--ink-dim);font-size:12px;margin-bottom:18px;}
+#auth-error{background:rgba(201,85,60,.12);border:1px solid rgba(201,85,60,.35);color:#e2a495;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-bottom:10px;display:none;}
+#auth-link{text-align:center;margin-top:14px;font-size:13px;color:var(--ink-dim);}
+#auth-link a{color:var(--soja);text-decoration:none;font-weight:600;}
+#auth-forgot{text-align:center;margin-top:10px;font-size:12.5px;}
+#auth-forgot a{color:var(--ink-dim);text-decoration:underline;}
+#pdf-map-render{position:fixed;left:-9999px;top:0;width:700px;height:460px;}
+</style>
+</head>
+<body>
+<div id="splash-screen">
+  <img src="icon-192.png" alt="PragaTrack">
+  <h1>PragaTrack</h1>
+  <p>Desenvolvido por João Divino Barbosa</p>
+</div>
+
+<div id="auth-screen" class="hide">
+  <div class="mark"><img src="icon-192.png" alt="PragaTrack"></div>
+  <h1>PragaTrack</h1>
+  <div class="sub" id="auth-subtitle">Entre para acessar suas avaliações</div>
+
+  <div id="auth-error"></div>
+
+  <div id="auth-form-login">
+    <label>E-mail</label>
+    <input type="email" id="login-email" placeholder="seu@email.com">
+    <label>Senha</label>
+    <input type="password" id="login-senha" placeholder="••••••••">
+    <button class="btn btn-primary" style="margin-top:16px;" onclick="doLogin()">Entrar</button>
+    <div id="auth-forgot"><a href="#" onclick="doForgotPassword();return false;">Esqueci minha senha</a></div>
+    <div id="auth-link">Ainda não tem conta? <a href="#" onclick="showAuthMode('cadastro');return false;">Criar conta</a></div>
+  </div>
+
+  <div id="auth-form-cadastro" style="display:none;">
+    <label>Nome</label>
+    <input type="text" id="cad-nome" placeholder="Seu nome">
+    <label>E-mail</label>
+    <input type="email" id="cad-email" placeholder="seu@email.com">
+    <label>Senha</label>
+    <input type="password" id="cad-senha" placeholder="Mínimo 6 caracteres">
+    <label>Confirmar senha</label>
+    <input type="password" id="cad-senha2" placeholder="Repita a senha">
+    <button class="btn btn-primary" style="margin-top:16px;" onclick="doCadastro()">Criar conta</button>
+    <div id="auth-link">Já tem conta? <a href="#" onclick="showAuthMode('login');return false;">Entrar</a></div>
+  </div>
+</div>
+
+<div id="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="mark"><img src="icon-192.png" alt="PragaTrack"></div>
+      <div>
+        <h1>PragaTrack</h1>
+        <small>Avaliação de pragas · Soja & Milho</small>
+      </div>
+    </div>
+    <button class="icon-btn" onclick="openSettings()">⚙</button>
+  </div>
+
+  <!-- ===================== HOME ===================== -->
+  <div class="screen active" id="screen-home">
+    <div class="crop-toggle">
+      <button class="crop-btn soja active" id="btn-crop-soja" onclick="setHomeCrop('soja')">🌱 SOJA<span id="cnt-soja">0 avaliações</span></button>
+      <button class="crop-btn milho" id="btn-crop-milho" onclick="setHomeCrop('milho')">🌽 MILHO<span id="cnt-milho">0 avaliações</span></button>
+    </div>
+
+    <button class="btn btn-primary" id="btn-new-assessment" onclick="startNewAssessment()">＋ Nova avaliação de campo</button>
+
+    <div class="card" style="margin-top:14px;" id="home-last-card" style="display:none;"></div>
+
+    <h3 style="margin-top:18px;font-size:14px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.05em;">Avaliações recentes</h3>
+    <div id="home-history-list"></div>
+  </div>
+
+  <!-- ===================== NOVA AVALIAÇÃO — SETUP ===================== -->
+  <div class="screen" id="screen-setup">
+    <h2>Nova avaliação</h2>
+    <p class="muted">Cultura, talhão e data — os pontos de amostragem são coletados na próxima etapa.</p>
+    <div class="card">
+      <label>Cultura</label>
+      <div class="crop-toggle">
+        <button class="crop-btn soja active" id="setup-crop-soja" onclick="setSetupCrop('soja')">🌱 Soja</button>
+        <button class="crop-btn milho" id="setup-crop-milho" onclick="setSetupCrop('milho')">🌽 Milho</button>
+      </div>
+      <label>Fazenda</label>
+      <input type="text" id="input-fazenda" placeholder="Ex: Fazenda Rio da Vida">
+      <label>Talhão</label>
+      <input type="text" id="input-talhao" placeholder="Ex: Talhão 12">
+      <label>Estádio da cultura</label>
+      <select id="input-estadio"></select>
+      <label>Responsável pela amostragem</label>
+      <input type="text" id="input-responsavel" placeholder="Nome do avaliador">
+    </div>
+    <button class="btn btn-primary" onclick="confirmSetup()">Iniciar coleta de pontos →</button>
+  </div>
+
+  <!-- ===================== COLETA ===================== -->
+  <div class="screen" id="screen-coleta">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <h2 id="coleta-title">Coleta de pontos</h2>
+        <p class="muted" id="coleta-sub">—</p>
+      </div>
+      <span class="badge-crop" id="coleta-badge">SOJA</span>
+    </div>
+
+    <div style="position:relative;">
+      <div class="map-box" id="coleta-map"></div>
+      <button class="icon-btn" style="position:absolute;bottom:10px;right:10px;z-index:1000;" onclick="locateMe('coleta')" title="Minha localização">🎯</button>
+    </div>
+    <div class="map-legend" style="margin-top:6px;"><span><i style="background:#4a90d9;"></i>Você está aqui</span></div>
+    <div id="kml-status"></div>
+    <input type="file" accept=".kml,.kmz" id="kml-input" style="display:none" onchange="onKmlFileSelected(event)">
+    <button class="btn btn-outline btn-sm" style="margin-bottom:8px;" onclick="document.getElementById('kml-input').click()">🗺️ Importar talhão/pontos (KML/KMZ)</button>
+
+    <div class="stat-grid">
+      <div class="stat-box"><div class="n" id="stat-npontos">0</div><div class="l">Pontos</div></div>
+      <div class="stat-box"><div class="n" id="stat-pragas">0</div><div class="l">Pragas encontradas</div></div>
+    </div>
+
+    <div id="pontos-list"></div>
+
+    <button class="btn btn-milho" onclick="openAddPoint()" style="margin-top:6px;">📍 Adicionar ponto de amostragem</button>
+    <button class="btn btn-outline" onclick="abrirGerarPontos()" style="margin-top:8px;">🧭 Gerar outros pontos a partir do 1º</button>
+    <button class="btn btn-primary" style="margin-top:8px;" onclick="finalizeAssessment()" id="btn-finalizar" disabled>Finalizar avaliação →</button>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="cancelAssessment()">Cancelar</button>
+  </div>
+
+  <!-- ===================== RESULTADO ===================== -->
+  <div class="screen" id="screen-resultado">
+    <h2>Resultado da avaliação</h2>
+    <p class="muted" id="res-sub">—</p>
+
+    <div id="res-recs"></div>
+
+    <div style="position:relative;">
+      <div class="map-box" id="res-map"></div>
+      <button class="icon-btn" style="position:absolute;bottom:10px;right:10px;z-index:1000;" onclick="locateMe('res')" title="Minha localização">🎯</button>
+    </div>
+    <div class="map-legend">
+      <span><i style="background:#5a9e5a;"></i>Abaixo do NC</span>
+      <span><i style="background:#d9b33e;"></i>Atenção</span>
+      <span><i style="background:#c9553c;"></i>Controlar</span>
+      <span><i style="background:#4a90d9;"></i>Você está aqui</span>
+    </div>
+
+    <h3 style="font-size:14px;color:var(--ink-dim);text-transform:uppercase;letter-spacing:.05em;margin-top:16px;">Pontos amostrados</h3>
+    <div id="res-pontos-list"></div>
+
+    <div class="row" style="margin-top:14px;">
+      <button class="btn btn-outline" onclick="exportPDF(currentAssessmentId)">📄 Exportar PDF</button>
+      <button class="btn btn-outline" onclick="shareWhatsApp(currentAssessmentId)">📲 WhatsApp</button>
+    </div>
+    <button class="btn btn-primary" style="margin-top:8px;" onclick="goHome()">Concluir</button>
+  </div>
+
+  <!-- ===================== HISTÓRICO ===================== -->
+  <div class="screen" id="screen-historico">
+    <h2>Histórico</h2>
+    <div class="row" style="margin-bottom:10px;">
+      <select id="hist-filter-cultura" onchange="renderHistorico()">
+        <option value="todas">Todas as culturas</option>
+        <option value="soja">Soja</option>
+        <option value="milho">Milho</option>
+      </select>
+      <select id="hist-filter-status" onchange="renderHistorico()">
+        <option value="todos">Todos os status</option>
+        <option value="controle">Controle recomendado</option>
+        <option value="ok">Abaixo do nível</option>
+      </select>
+    </div>
+    <div id="historico-list"></div>
+  </div>
+
+  <!-- ===================== GUIA DE PRAGAS ===================== -->
+  <div class="screen" id="screen-guia">
+    <h2>Guia de pragas</h2>
+    <div class="crop-toggle">
+      <button class="crop-btn soja active" id="guia-crop-soja" onclick="setGuiaCrop('soja')">🌱 Soja</button>
+      <button class="crop-btn milho" id="guia-crop-milho" onclick="setGuiaCrop('milho')">🌽 Milho</button>
+    </div>
+    <div class="search-box">
+      <input type="text" id="guia-search" placeholder="Buscar praga..." oninput="renderGuia()">
+    </div>
+    <div class="card" id="guia-list"></div>
+  </div>
+
+  <div class="navbar">
+    <div class="navbar-inner">
+      <button class="navbtn active" data-tab="home" onclick="showTab('home')"><span class="ic">⌂</span>Início</button>
+      <button class="navbtn" data-tab="historico" onclick="showTab('historico')"><span class="ic">🕘</span>Histórico</button>
+      <button class="navbtn" data-tab="guia" onclick="showTab('guia')"><span class="ic">📖</span>Guia</button>
+    </div>
+  </div>
+  <div class="app-footer">Desenvolvido por João Divino Barbosa</div>
+</div>
+
+<!-- ===================== MODAL: ADICIONAR PONTO ===================== -->
+<div class="modal-bg hidden" id="modal-point">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3 id="modal-point-title">Novo ponto — #1</h3>
+
+    <label>Localização</label>
+    <div id="gps-status" class="dashline">Toque para capturar GPS</div>
+    <button class="btn btn-outline btn-sm" style="margin-top:8px;" onclick="captureGPS()">📍 Capturar localização</button>
+
+    <label>Foto (opcional)</label>
+    <input type="file" accept="image/*" capture="environment" id="photo-input" style="display:none" onchange="onPhotoSelected(event)">
+    <img id="photo-preview" class="photo-preview" style="display:none;">
+    <button class="btn btn-outline btn-sm" onclick="document.getElementById('photo-input').click()">📷 Tirar / escolher foto</button>
+
+    <div id="ai-suggest-box"></div>
+
+    <label>Identificar praga</label>
+    <div class="search-box">
+      <input type="text" id="point-pest-search" placeholder="Buscar na lista..." oninput="renderPointPestList()">
+    </div>
+    <div id="point-pest-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;"></div>
+
+    <div id="point-pest-selected" style="display:none;">
+      <div class="card" style="margin-top:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+            <div class="pest-thumb" id="sel-pest-thumb" style="width:40px;height:40px;"></div>
+            <div style="min-width:0;">
+              <div style="font-weight:700;" id="sel-pest-name">—</div>
+              <div class="muted" id="sel-pest-unit">—</div>
+            </div>
+          </div>
+          <button class="btn-sm btn-outline" style="width:auto;padding:6px 10px;flex-shrink:0;" onclick="clearSelectedPest()">trocar</button>
+        </div>
+        <div id="point-count-fields"></div>
+        <div id="point-status-preview" style="margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <label>Nenhuma praga relevante?</label>
+    <button class="btn btn-outline btn-sm" onclick="setNoPest()">✓ Ponto sem infestação relevante</button>
+
+    <button class="btn btn-primary" style="margin-top:16px;" onclick="savePoint()">Salvar ponto</button>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-point')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ===================== MODAL: SETTINGS ===================== -->
+<div class="modal-bg hidden" id="modal-settings">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3>Ajustes</h3>
+    <label>Endpoint de identificação por IA (opcional)</label>
+    <input type="text" id="settings-ai-endpoint" placeholder="https://seu-proxy.vercel.app/api/identificar">
+    <p class="muted">Se configurado, a foto do ponto é enviada para esse endpoint (proxy que você hospeda, ex: Vercel Function chamando a API da Anthropic) para sugerir a praga automaticamente — igual ao proxy do satélite. Sem endpoint, a identificação é feita manualmente na lista.</p>
+    <label style="margin-top:14px;">Níveis de controle (edite se seu técnico usar outros valores)</label>
+    <div id="settings-thresholds"></div>
+    <button class="btn btn-primary" style="margin-top:14px;" onclick="saveSettings()">Salvar ajustes</button>
+    <label style="margin-top:14px;">Conta</label>
+    <p class="muted" id="settings-account-email">—</p>
+    <button class="btn btn-danger" style="margin-top:4px;" onclick="doLogout()">Sair da conta</button>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-settings')">Fechar</button>
+  </div>
+</div>
+
+<!-- ===================== MODAL: DETALHE PONTO ===================== -->
+<div class="modal-bg hidden" id="modal-pest-detail">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div id="pest-detail-body"></div>
+    <button class="btn btn-outline" style="margin-top:14px;" onclick="closeModal('modal-pest-detail')">Fechar</button>
+  </div>
+</div>
+<input type="file" accept="image/*" capture="environment" id="pest-photo-input" style="display:none" onchange="onPestPhotoSelected(event)">
+
+<!-- ===================== MODAL: GERAR PONTOS AUTOMÁTICOS ===================== -->
+<div class="modal-bg hidden" id="modal-gerar-pontos">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3>Gerar pontos a partir do 1º</h3>
+    <p class="muted">O ponto 1 (já marcado, com GPS real) é o ponto de partida. Os demais são posições calculadas — ao chegar em cada um, abra o ponto na lista e toque em "capturar localização" para corrigir com o GPS real do aparelho.</p>
+
+    <label>Padrão de distribuição</label>
+    <select id="gp-padrao" onchange="atualizarCamposGerarPontos()">
+      <option value="zigzag">Zigue-zague em W (recomendado p/ pragas)</option>
+      <option value="grade">Grade regular por espaçamento</option>
+      <option value="radial">Distância fixa a partir do 1º ponto</option>
+    </select>
+
+    <label>Base para os pontos</label>
+    <select id="gp-base" onchange="atualizarCamposGerarPontos()">
+      <option value="talhao">Dentro do contorno do talhão (KML importado)</option>
+      <option value="manual">Área/raio que eu informar agora</option>
+    </select>
+    <p class="muted" id="gp-base-info" style="margin-top:-4px;"></p>
+
+    <div id="gp-campo-raio">
+      <label>Raio a partir do 1º ponto (metros)</label>
+      <input type="number" min="10" step="10" id="gp-raio" value="100">
+    </div>
+
+    <div id="gp-campo-qtd">
+      <label>Quantidade de pontos a gerar (sem contar o 1º)</label>
+      <input type="number" min="1" step="1" id="gp-qtd" value="4">
+    </div>
+
+    <div id="gp-campo-espacamento" style="display:none;">
+      <label>Espaçamento entre pontos da grade (metros)</label>
+      <input type="number" min="10" step="10" id="gp-espacamento" value="80">
+    </div>
+
+    <button class="btn btn-primary" style="margin-top:16px;" onclick="confirmarGerarPontos()">Gerar pontos</button>
+    <button class="btn btn-outline" style="margin-top:8px;" onclick="closeModal('modal-gerar-pontos')">Cancelar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="pdf-map-render"></div>
+
+<script src="pests-db.js"></script>
+<script src="pest-icons.js"></script>
+<script src="pest-photos.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
